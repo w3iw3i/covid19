@@ -68,9 +68,10 @@ deaths_us_long = deaths_us.melt(id_vars=['Province_State', 'Country_Region', 'La
 deaths_us_long.rename(columns={'Long_' : 'Long'}, inplace=True)                                                                                   
 
 
-confirmed_all = confirmed_long.append(confirmed_us_long)
-deaths_all = deaths_long.append(deaths_us_long)
+# confirmed_all = confirmed_long.append(confirmed_us_long)
+# deaths_all = deaths_long.append(deaths_us_long)
 
+# print(confirmed_long.loc[confirmed_long['Country_Region'] == "US"])
 
 # print(confirmed_all.shape)
 # print(deaths_all.shape)
@@ -83,7 +84,7 @@ deaths_all = deaths_long.append(deaths_us_long)
 # merge dataframes
 # ================
 
-master_table = pd.merge(left=confirmed_all, right=deaths_all, how='left',
+master_table = pd.merge(left=confirmed_long, right=deaths_long, how='left',
                       on=['Province_State', 'Country_Region', 'Date', 'Lat', 'Long'])
 master_table = pd.merge(left=master_table, right=recovered_long, how='left',
                       on=['Province_State', 'Country_Region', 'Date', 'Lat', 'Long'])
@@ -102,7 +103,25 @@ print(master_table.head())
 print(master_table.tail(10))
 
 
-print(master_table.groupby('Date')['Confirmed'].sum())
-print(master_table.groupby('Date')['Deaths'].sum())
-# print(master_table['Deaths'].sum())
-# print(master_table['Recovered'].sum())
+# print(master_table.groupby('Date')['Confirmed'].sum())
+# print(master_table.groupby('Date')['Deaths'].sum())
+# # print(master_table['Deaths'].sum())
+# # print(master_table['Recovered'].sum())
+
+
+# # fixing Country names
+# # ====================
+
+# renaming countries, regions, provinces
+master_table['Country_Region'] = master_table['Country_Region'].replace('Korea, South', 'South Korea')
+
+# Greenland
+master_table.loc[master_table['Province_State'] =='Greenland', 'Country_Region'] = 'Greenland'
+
+# Mainland china to China
+master_table['Country_Region'] = master_table['Country_Region'].replace('Mainland China', 'China')
+
+
+master_latest = master_table.loc[master_table['Date'] == '2021-07-06']
+
+master_latest.to_csv('master_latest.csv')
