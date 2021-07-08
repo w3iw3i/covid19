@@ -1,45 +1,34 @@
-# import libraries
+# Import libraries
 # ================
 
 # for date and time opeations
 from datetime import datetime, timedelta
 # for file and folder operations
 import os
+import sys
+from pathlib import Path
 # for regular expression opeations
 import re
 # for listing files in a folder
 import glob
 # for getting web contents
-import requests 
+import requests
 # storing and analysing data
 import pandas as pd
 # numerical analysis
 import numpy as np
 
 
-# dataset
+
+# Read in dataset
 # ======
 
-confirmed = pd.read_csv('../data/time_series_covid19_confirmed_global.csv')
-deaths = pd.read_csv('../data/time_series_covid19_deaths_global.csv')
-recovered = pd.read_csv('../data/time_series_covid19_recovered_global.csv')
-confirmed_us = pd.read_csv('../data/time_series_covid19_confirmed_us.csv')
-deaths_us = pd.read_csv('../data/time_series_covid19_deaths_us.csv')
-
-
-# print(confirmed_df.head())
-# print(deaths_df.head())
-# print(recovered_df.head())
-# print(confirmed_us_df.head())
-# print(deaths_us_df.head())
-
-
-# print(confirmed_df.columns)
-# print(deaths_df.columns)
-# print(recovered_df.columns)
-# print(confirmed_us_df.columns)
-# print(deaths_us_df.columns)
-
+path = Path(__file__).parent
+confirmed = pd.read_csv((path / './data/time_series_covid19_confirmed_global.csv').resolve())
+deaths = pd.read_csv((path / './data/time_series_covid19_deaths_global.csv').resolve())
+recovered = pd.read_csv((path / './data/time_series_covid19_recovered_global.csv').resolve())
+# confirmed_us = pd.read_csv('../data/time_series_covid19_confirmed_us.csv')
+# deaths_us = pd.read_csv('../data/time_series_covid19_deaths_us.csv')
 
 # extract date columns
 dates = confirmed.columns[4:]
@@ -48,46 +37,31 @@ dates = confirmed.columns[4:]
 # ==================================
 confirmed_long = confirmed.melt(id_vars=['Province/State', 'Country/Region', 'Lat', 'Long'], 
                             value_vars=dates, var_name='Date', value_name='Confirmed')
-confirmed_long.rename(columns={'Province/State' : 'Province_State', 'Country/Region' : 'Country_Region'}, inplace=True)
 
 deaths_long = deaths.melt(id_vars=['Province/State', 'Country/Region', 'Lat', 'Long'], 
-                            value_vars=dates, var_name='Date', value_name='Deaths')
-deaths_long.rename(columns={'Province/State' : 'Province_State', 'Country/Region' : 'Country_Region'}, inplace=True)                          
+                            value_vars=dates, var_name='Date', value_name='Deaths')                         
 
 recovered_long = recovered.melt(id_vars=['Province/State', 'Country/Region', 'Lat', 'Long'], 
                             value_vars=dates, var_name='Date', value_name='Recovered')
-recovered_long.rename(columns={'Province/State' : 'Province_State', 'Country/Region' : 'Country_Region'}, inplace=True)
-recovered_long = recovered_long[recovered_long['Country_Region']!='Canada']
+# recovered_long = recovered_long[recovered_long['Country_Region']!='Canada']
 
-confirmed_us_long = confirmed_us.melt(id_vars=['Province_State', 'Country_Region', 'Lat', 'Long_'], 
-                            value_vars=dates, var_name='Date', value_name='Confirmed')
-confirmed_us_long.rename(columns={'Long_' : 'Long'}, inplace=True)
+# confirmed_us_long = confirmed_us.melt(id_vars=['Province_State', 'Country_Region', 'Lat', 'Long_'], 
+#                             value_vars=dates, var_name='Date', value_name='Confirmed')
+# confirmed_us_long.rename(columns={'Long_' : 'Long'}, inplace=True)
 
-deaths_us_long = deaths_us.melt(id_vars=['Province_State', 'Country_Region', 'Lat', 'Long_'], 
-                            value_vars=dates, var_name='Date', value_name='Deaths')  
-deaths_us_long.rename(columns={'Long_' : 'Long'}, inplace=True)                                                                                   
+# deaths_us_long = deaths_us.melt(id_vars=['Province_State', 'Country_Region', 'Lat', 'Long_'], 
+#                             value_vars=dates, var_name='Date', value_name='Deaths')  
+# deaths_us_long.rename(columns={'Long_' : 'Long'}, inplace=True)                                                                                   
 
-
-# confirmed_all = confirmed_long.append(confirmed_us_long)
-# deaths_all = deaths_long.append(deaths_us_long)
-
-# print(confirmed_long.loc[confirmed_long['Country_Region'] == "US"])
-
-# print(confirmed_all.shape)
-# print(deaths_all.shape)
-# print(recovered_long.shape)
-
-# print(confirmed.columns)
-# print(deaths.columns)
-# print(recovered.columns)
 
 # merge dataframes
 # ================
 
 master_table = pd.merge(left=confirmed_long, right=deaths_long, how='left',
-                      on=['Province_State', 'Country_Region', 'Date', 'Lat', 'Long'])
+                      on=['Province/State', 'Country/Region', 'Date', 'Lat', 'Long'])
 master_table = pd.merge(left=master_table, right=recovered_long, how='left',
-                      on=['Province_State', 'Country_Region', 'Date', 'Lat', 'Long'])
+                      on=['Province/State', 'Country/Region', 'Date', 'Lat', 'Long'])
+master_table.rename(columns={'Province/State' : 'State', 'Country/Region' : 'Country'}, inplace=True)
 
 
 # Convert to proper date format
@@ -99,8 +73,11 @@ master_table['Recovered'] = master_table['Recovered'].fillna(0)
 # convert to int datatype
 master_table['Recovered'] = master_table['Recovered'].astype('int')
 
-print(master_table.head())
-print(master_table.tail(10))
+# Active Case = confirmed - deaths - recovered
+master_table['Active'] = master_table['Confirmed'] - master_table['Deaths'] - master_table['Recovered']
+
+# print(master_table.head())
+# print(master_table.tail(10))
 
 
 # print(master_table.groupby('Date')['Confirmed'].sum())
@@ -113,13 +90,27 @@ print(master_table.tail(10))
 # # ====================
 
 # renaming countries, regions, provinces
-master_table['Country_Region'] = master_table['Country_Region'].replace('Korea, South', 'South Korea')
+master_table['Country'] = master_table['Country'].replace('Korea, South', 'South Korea')
 
 # Greenland
-master_table.loc[master_table['Province_State'] =='Greenland', 'Country_Region'] = 'Greenland'
+master_table.loc[master_table['State'] =='Greenland', 'Country'] = 'Greenland'
 
 # Mainland china to China
-master_table['Country_Region'] = master_table['Country_Region'].replace('Mainland China', 'China')
+master_table['Country'] = master_table['Country'].replace('Mainland China', 'China')
+
+
+# filling missing values 
+# ======================
+# fill missing province/state value with ''
+master_table[['State']] = master_table[['State']].fillna('')
+
+# fill missing numerical values with 0
+cols = ['Confirmed', 'Deaths', 'Recovered', 'Active']
+master_table[cols] = master_table[cols].fillna(0)
+
+
+print(master_table.info())
+print(master_table)
 
 
 master_latest = master_table.loc[master_table['Date'] == '2021-07-06']
